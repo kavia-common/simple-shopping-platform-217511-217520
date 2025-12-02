@@ -25,7 +25,9 @@ export function getApiBaseUrl() {
 export async function getProducts() {
   /** This is a public function. */
   const base = getApiBaseUrl();
-  const url = base ? `${base.replace(/\\/$/, '')}/api/products` : '/api/products';
+  // Safely normalize by trimming a single trailing slash without regex
+  const normalized = base && base.endsWith('/') ? base.slice(0, -1) : base;
+  const url = normalized ? `${normalized}/api/products` : '/api/products';
   const res = await fetch(url, {
     headers: {
       // If backend enforces CORS, ensure it includes appropriate Access-Control-Allow-Origin.
