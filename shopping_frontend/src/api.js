@@ -4,7 +4,7 @@
  * This returns the base URL for the backend API.
  * Priority:
  * 1) REACT_APP_API_BASE_URL env variable
- * 2) Default: http://localhost:3001
+ * 2) Default: same-origin ('' so fetch uses relative path, enabling CRA proxy and preview proxies)
  */
 export function getApiBaseUrl() {
   /** This is a public function. */
@@ -12,8 +12,8 @@ export function getApiBaseUrl() {
   if (process.env.REACT_APP_API_BASE_URL) {
     return process.env.REACT_APP_API_BASE_URL;
   }
-  // Fallback: fixed backend URL for local development and default usage.
-  return 'http://localhost:3001';
+  // Fallback: same-origin. Using empty string means consumers should use relative URLs.
+  return '';
 }
 
 /**
@@ -25,7 +25,7 @@ export function getApiBaseUrl() {
 export async function getProducts() {
   /** This is a public function. */
   const base = getApiBaseUrl();
-  const url = `${base}/api/products`;
+  const url = base ? `${base.replace(/\\/$/, '')}/api/products` : '/api/products';
   const res = await fetch(url, {
     headers: {
       // If backend enforces CORS, ensure it includes appropriate Access-Control-Allow-Origin.

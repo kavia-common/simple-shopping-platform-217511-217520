@@ -81,7 +81,7 @@ export default function App() {
       <main className="container" style={{ paddingTop: 24 }}>
         <div className="card" style={{ marginBottom: 16 }}>
           <p style={{ margin: 0 }}>
-            Backend API: <code>{getApiBaseUrl() || '(same-origin)'}</code>
+            Backend API: <code>{getApiBaseUrl() === '' ? '(same-origin)' : getApiBaseUrl()}</code>
           </p>
         </div>
 
