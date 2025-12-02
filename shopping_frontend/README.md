@@ -18,6 +18,8 @@ This project includes a `.env` file that sets:
 These settings allow the dev server to accept requests from the preview host while binding to `0.0.0.0`.  
 If you need to customize, update `shopping_frontend/.env`.
 
+Note: These settings affect only the development server (npm start). Production builds created with `npm run build` are not impacted.
+
 ## Backend API
 - Default backend base URL: same-origin (e.g., calling `/api/products`).
 - In development, the CRA dev server proxies `/api/*` to `http://localhost:3001` (see package.json "proxy").
