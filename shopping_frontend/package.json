@@ -4,7 +4,7 @@
   "private": true,
   "description": "Simple shopping frontend for browsing products, managing cart, and checkout.",
   "scripts": {
-    "start": "HOST=${HOST:-0.0.0.0} react-scripts start",
+    "start": "HOST=${HOST:-0.0.0.0} DANGEROUSLY_DISABLE_HOST_CHECK=${DANGEROUSLY_DISABLE_HOST_CHECK:-true} WDS_SOCKET_PORT=${WDS_SOCKET_PORT:-3000} BROWSER=${BROWSER:-none} PORT=${PORT:-3000} react-scripts start",
     "build": "react-scripts build",
     "test": "CI=true react-scripts test --watchAll=false",
     "eject": "react-scripts eject"

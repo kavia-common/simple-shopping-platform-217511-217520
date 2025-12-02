@@ -9,26 +9,24 @@ A minimal React app for the simple shopping platform.
 - npm test
 
 ## Fixing "Invalid Host header" in development
-In preview/proxied environments, CRA can show "Invalid Host header" when accessed via a non-localhost hostname.  
-This project includes dev-only environment settings to make the dev server work reliably:
+In preview/proxied environments, CRA can show "Invalid Host header" when accessed via a non-localhost hostname.
 
-Files:
-- `.env`
-- `.env.development.local` (fallback/override for local dev)
+This project applies a deterministic fix directly in the start script so no local `.env` is required:
+- package.json start script sets, by default:
+  - `HOST=0.0.0.0`
+  - `DANGEROUSLY_DISABLE_HOST_CHECK=true`
+  - `WDS_SOCKET_PORT=3000`
+  - `BROWSER=none`
+  - `PORT=3000`
 
-Both set:
-- `HOST=0.0.0.0` and `PORT=3000` (binds to all interfaces, stable port)
-- `DANGEROUSLY_DISABLE_HOST_CHECK=true` (disables host check in development)
-- `HTTPS=false` (use HTTP)
-- `WDS_SOCKET_PORT=3000` (stabilizes dev server websocket in proxied environments)
-- `BROWSER=none` (optional, prevents auto-browser open)
-
-Additionally, the start script ensures `HOST` is honored:
-- package.json: `"start": "HOST=${HOST:-0.0.0.0} react-scripts start"`
+You can still override these via environment if needed.
 
 Security note:
-- Disabling host checks is unsafe for production. These settings are for development only and only affect `npm start`.  
+- Disabling host checks is unsafe for production. These settings are for development only and only affect `npm start`.
 - Production builds created with `npm run build` are not impacted.
+
+Optional:
+- See `.env.example` for variables you may set locally (copy to `.env` if desired).
 
 ## Backend API
 - Default backend base URL: same-origin (e.g., calling `/api/products`).
