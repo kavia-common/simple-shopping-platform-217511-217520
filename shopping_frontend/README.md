@@ -29,12 +29,11 @@ Optional:
 - See `.env.example` for variables you may set locally (copy to `.env` if desired).
 
 ## Backend API
-- Default backend base URL: same-origin (e.g., calling `/api/products`).
-- In development, the CRA dev server proxies `/api/*` to `http://localhost:3001` (see package.json "proxy").
+- Default backend base URL: http://localhost:3001
 - You can override the base URL via environment at runtime with `REACT_APP_API_BASE_URL`.
 
 Examples:
-- Using default: `npm start` (will proxy to http://localhost:3001)
+- Using default: `npm start` (frontend at http://localhost:3000 calls backend at http://localhost:3001)
 - Custom base URL:
   - Unix/macOS: `REACT_APP_API_BASE_URL=http://localhost:4000 npm start`
   - Windows (PowerShell): `$env:REACT_APP_API_BASE_URL="http://localhost:4000"; npm start`

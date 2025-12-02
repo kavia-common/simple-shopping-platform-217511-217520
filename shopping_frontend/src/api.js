@@ -12,9 +12,8 @@ export function getApiBaseUrl() {
   if (process.env.REACT_APP_API_BASE_URL) {
     return process.env.REACT_APP_API_BASE_URL;
   }
-  // Fallback: same-origin relative base to avoid cross-origin in preview environments.
-  // This lets the app call "/api/..." which can be proxied in development to the backend.
-  return '';
+  // Fallback: fixed backend URL for local development and default usage.
+  return 'http://localhost:3001';
 }
 
 /**
