@@ -8,7 +8,13 @@
  */
 export function getApiBaseUrl() {
   /** This is a public function. */
-  return process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
+  // Prefer environment override when provided.
+  if (process.env.REACT_APP_API_BASE_URL) {
+    return process.env.REACT_APP_API_BASE_URL;
+  }
+  // Fallback: same-origin relative base to avoid cross-origin in preview environments.
+  // This lets the app call "/api/..." which can be proxied in development to the backend.
+  return '';
 }
 
 /**

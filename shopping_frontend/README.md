@@ -9,8 +9,8 @@ A minimal React app for the simple shopping platform.
 - npm test
 
 ## Backend API
-- Default backend base URL: `http://localhost:3001`
-- The frontend fetches products from: `<BASE_URL>/api/products`
+- Default backend base URL: same-origin (e.g., calling `/api/products`).
+- In development, the CRA dev server proxies `/api/*` to `http://localhost:3001` (see package.json "proxy").
 - You can override the base URL via environment at runtime with `REACT_APP_API_BASE_URL`.
 
 Examples:
