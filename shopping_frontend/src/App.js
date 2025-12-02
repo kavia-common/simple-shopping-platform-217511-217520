@@ -6,7 +6,7 @@ import { Header, Card, buttonStyle, theme } from './ui';
 // PUBLIC_INTERFACE
 function App() {
   /** Minimal SPA with internal "routes": products | cart | orders | auth */
-  const [route, setRoute] = useState('products');
+  const [route, setRoute] = useState('products'); // home route
   const [products, setProducts] = useState([]);
   const [token, setToken] = useState(() => localStorage.getItem('token') || '');
   const [user, setUser] = useState(() => {
@@ -17,8 +17,30 @@ function App() {
   const [cart, setCart] = useState({ items: [], subtotal: 0 });
   const cartCount = useMemo(() => cart.items.reduce((a, i) => a + i.quantity, 0), [cart]);
 
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [errorProducts, setErrorProducts] = useState('');
+
   useEffect(() => {
-    Api.products().then(setProducts).catch(console.error);
+    // Fetch products from backend (port 3001) using api.js
+    setLoadingProducts(true);
+    Api.products()
+      .then((list) => {
+        // Ensure placeholders for missing images
+        const withImages = (list || []).map((p) => ({
+          ...p,
+          image:
+            p?.image && String(p.image).trim().length > 0
+              ? p.image
+              : 'https://via.placeholder.com/400x300.png?text=Product',
+        }));
+        setProducts(withImages);
+        setErrorProducts('');
+      })
+      .catch((e) => {
+        console.error(e);
+        setErrorProducts(e.message || 'Failed to load products');
+      })
+      .finally(() => setLoadingProducts(false));
   }, []);
 
   useEffect(() => {
@@ -45,7 +67,7 @@ function App() {
     setRoute('products');
   }
 
-  async function addToCart(productId) {
+  async function addToCart(productId, onSuccess) {
     try {
       if (!isAuthed) {
         setRoute('auth');
@@ -53,6 +75,7 @@ function App() {
       }
       const updated = await Api.addToCart(token, productId, 1);
       setCart(updated);
+      if (onSuccess) onSuccess();
     } catch (e) {
       alert(e.message);
     }
@@ -98,17 +121,23 @@ function App() {
 
       <main style={{ maxWidth: 1024, margin: '0 auto', padding: 16 }}>
         {route === 'products' && (
-          <ProductsPage products={products} onAdd={addToCart} />
+          <ProductsPage
+            products={products}
+            onAdd={addToCart}
+            loading={loadingProducts}
+            error={errorProducts}
+          />
         )}
         {route === 'cart' && (
-          <CartPage cart={cart} onQty={updateQty} onRemove={removeItem} onOrder={placeOrder} />
+          <CartPage
+            cart={cart}
+            onQty={updateQty}
+            onRemove={removeItem}
+            onOrder={placeOrder}
+          />
         )}
-        {route === 'orders' && (
-          <OrdersPage isAuthed={isAuthed} />
-        )}
-        {route === 'auth' && (
-          <AuthPage onLogin={onLogin} />
-        )}
+        {route === 'orders' && <OrdersPage isAuthed={isAuthed} />}
+        {route === 'auth' && <AuthPage onLogin={onLogin} />}
       </main>
 
       <footer style={{ textAlign: 'center', padding: 16, color: '#6b7280' }}>
@@ -118,23 +147,111 @@ function App() {
   );
 }
 
-function ProductsPage({ products, onAdd }) {
+function ProductsPage({ products, onAdd, loading, error }) {
+  if (loading) {
+    return (
+      <Card>
+        <div style={{ color: '#6b7280' }}>Loading products...</div>
+      </Card>
+    );
+  }
+  if (error) {
+    return (
+      <Card>
+        <div style={{ color: theme.error }}>Error: {error}</div>
+      </Card>
+    );
+  }
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 16 }}>
-      {products.map(p => (
-        <Card key={p.id}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <img src={p.image} alt={p.name} style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 8 }} />
-            <div style={{ fontWeight: 700, color: theme.text }}>{p.name}</div>
-            <div style={{ color: '#6b7280', minHeight: 40 }}>{p.description}</div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ color: theme.primary, fontWeight: 700 }}>${p.price.toFixed(2)}</div>
-              <button style={buttonStyle('accent')} onClick={() => onAdd(p.id)}>Add</button>
-            </div>
-          </div>
-        </Card>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))',
+        gap: 16,
+      }}
+    >
+      {products.map((p) => (
+        <ProductCard key={p.id} product={p} onAdd={onAdd} />
       ))}
     </div>
+  );
+}
+
+function ProductCard({ product, onAdd }) {
+  const [added, setAdded] = useState(false);
+  const placeholder =
+    'https://via.placeholder.com/400x300.png?text=Product';
+
+  const imgSrc =
+    product?.image && String(product.image).trim().length > 0
+      ? product.image
+      : placeholder;
+
+  const handleAdd = async () => {
+    await onAdd(product.id, () => {
+      setAdded(true);
+      setTimeout(() => setAdded(false), 1200);
+    });
+  };
+
+  return (
+    <Card>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div
+          style={{
+            width: '100%',
+            height: 150,
+            borderRadius: 10,
+            overflow: 'hidden',
+            background: `linear-gradient(135deg, ${theme.primary}15, #ffffff)`,
+            border: `1px solid #e5e7eb`,
+          }}
+        >
+          <img
+            src={imgSrc}
+            alt={product?.name || 'Product image'}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              display: 'block',
+            }}
+            onError={(e) => {
+              e.currentTarget.src = placeholder;
+            }}
+          />
+        </div>
+        <div style={{ fontWeight: 700, color: theme.text }}>{product.name}</div>
+        <div style={{ color: '#6b7280', minHeight: 40 }}>
+          {product.description || 'No description available.'}
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div style={{ color: theme.primary, fontWeight: 800 }}>
+            ${Number(product.price || 0).toFixed(2)}
+          </div>
+          <button
+            style={{
+              ...buttonStyle('accent'),
+              background: added ? theme.primary : theme.secondary,
+              color: added ? '#fff' : '#111827',
+              boxShadow: added ? '0 2px 8px rgba(37,99,235,0.3)' : 'none',
+              transition: 'all 200ms ease',
+            }}
+            onClick={handleAdd}
+            aria-label={`Add ${product.name} to cart`}
+          >
+            {added ? 'Added!' : 'Add to Cart'}
+          </button>
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -148,18 +265,64 @@ function CartPage({ cart, onQty, onRemove, onOrder }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {cart.items.map(({ product, quantity, line_total }) => (
-              <div key={product.id} style={{ display: 'grid', gridTemplateColumns: '80px 1fr auto', gap: 12, alignItems: 'center' }}>
-                <img src={product.image} alt={product.name} style={{ width: 80, height: 60, objectFit: 'cover', borderRadius: 8 }} />
+              <div
+                key={product.id}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '80px 1fr auto',
+                  gap: 12,
+                  alignItems: 'center',
+                }}
+              >
+                <img
+                  src={
+                    product?.image && String(product.image).trim().length > 0
+                      ? product.image
+                      : 'https://via.placeholder.com/200x150.png?text=Product'
+                  }
+                  alt={product.name}
+                  style={{
+                    width: 80,
+                    height: 60,
+                    objectFit: 'cover',
+                    borderRadius: 8,
+                  }}
+                  onError={(e) => {
+                    e.currentTarget.src =
+                      'https://via.placeholder.com/200x150.png?text=Product';
+                  }}
+                />
                 <div>
                   <div style={{ fontWeight: 600 }}>{product.name}</div>
-                  <div style={{ color: '#6b7280' }}>${product.price.toFixed(2)} each</div>
+                  <div style={{ color: '#6b7280' }}>
+                    ${product.price.toFixed(2)} each
+                  </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <button style={buttonStyle('outline')} onClick={() => onQty(product.id, quantity - 1)}>-</button>
+                  <button
+                    style={buttonStyle('outline')}
+                    onClick={() => onQty(product.id, quantity - 1)}
+                  >
+                    -
+                  </button>
                   <span>{quantity}</span>
-                  <button style={buttonStyle('outline')} onClick={() => onQty(product.id, quantity + 1)}>+</button>
-                  <button style={buttonStyle('ghost')} onClick={() => onRemove(product.id)}>Remove</button>
-                  <div style={{ width: 80, textAlign: 'right', fontWeight: 600 }}>${line_total.toFixed(2)}</div>
+                  <button
+                    style={buttonStyle('outline')}
+                    onClick={() => onQty(product.id, quantity + 1)}
+                  >
+                    +
+                  </button>
+                  <button
+                    style={buttonStyle('ghost')}
+                    onClick={() => onRemove(product.id)}
+                  >
+                    Remove
+                  </button>
+                  <div
+                    style={{ width: 80, textAlign: 'right', fontWeight: 600 }}
+                  >
+                    ${line_total.toFixed(2)}
+                  </div>
                 </div>
               </div>
             ))}
@@ -173,7 +336,13 @@ function CartPage({ cart, onQty, onRemove, onOrder }) {
           <strong>${cart.subtotal.toFixed(2)}</strong>
         </div>
         <div style={{ height: 8 }} />
-        <button disabled={cart.items.length === 0} style={buttonStyle('primary')} onClick={onOrder}>Place Order</button>
+        <button
+          disabled={cart.items.length === 0}
+          style={buttonStyle('primary')}
+          onClick={onOrder}
+        >
+          Place Order
+        </button>
       </Card>
     </div>
   );
@@ -214,14 +383,16 @@ function AuthPage({ onLogin }) {
 
   return (
     <Card>
-      <h2 style={{ marginTop: 0 }}>{mode === 'login' ? 'Login' : 'Create Account'}</h2>
+      <h2 style={{ marginTop: 0 }}>
+        {mode === 'login' ? 'Login' : 'Create Account'}
+      </h2>
       <form onSubmit={submit} style={{ display: 'grid', gap: 12 }}>
         <label style={{ display: 'grid', gap: 4 }}>
           <span>Email</span>
           <input
             type="email"
             value={email}
-            onChange={e => setEmail(e.target.value)}
+            onChange={(e) => setEmail(e.target.value)}
             required
             placeholder="you@example.com"
             style={inputStyle}
@@ -232,7 +403,7 @@ function AuthPage({ onLogin }) {
           <input
             type="password"
             value={pwd}
-            onChange={e => setPwd(e.target.value)}
+            onChange={(e) => setPwd(e.target.value)}
             required
             minLength={6}
             placeholder="••••••••"
@@ -241,9 +412,13 @@ function AuthPage({ onLogin }) {
         </label>
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="submit" disabled={loading} style={buttonStyle('primary')}>
-            {loading ? 'Please wait...' : (mode === 'login' ? 'Login' : 'Sign up')}
+            {loading ? 'Please wait...' : mode === 'login' ? 'Login' : 'Sign up'}
           </button>
-          <button type="button" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} style={buttonStyle('outline')}>
+          <button
+            type="button"
+            onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+            style={buttonStyle('outline')}
+          >
             {mode === 'login' ? 'Create an account' : 'Have an account? Login'}
           </button>
         </div>
