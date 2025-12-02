@@ -1,16 +1,23 @@
 /**
  * Resolve API base URL.
  * Priority:
- *  1) REACT_APP_API_BASE env
- *  2) window.__API_BASE__ global (optional override)
- *  3) Derive from current location -> same host, port 3001, preserve protocol
- *     e.g., https://<host>:3001/api
+ *  1) REACT_APP_API_BASE env (preferred)
+ *  2) REACT_APP_BACKEND_URL env (alias; may include /api already)
+ *  3) window.__API_BASE__ global (optional override)
+ *  4) Derive from current location -> same protocol/host, backend port 3001, path /api
  * Falls back to http://localhost:3001/api for non-browser/test contexts.
  */
 function resolveApiBase() {
-  const envBase = process.env.REACT_APP_API_BASE;
-  if (envBase && typeof envBase === 'string' && envBase.trim()) {
-    return envBase.trim().replace(/\/+$/, '');
+  const candidates = [
+    process.env.REACT_APP_API_BASE,
+    process.env.REACT_APP_BACKEND_URL
+  ].filter(Boolean);
+
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.trim()) {
+      const v = c.trim().replace(/\/+$/, '');
+      return v.endsWith('/api') ? v : `${v}/api`;
+    }
   }
 
   // Use a global if provided (can be injected by hosting)
@@ -22,7 +29,7 @@ function resolveApiBase() {
   if (typeof window !== 'undefined' && window.location) {
     try {
       const { protocol, hostname } = window.location;
-      // Always target backend port 3001 in this project
+      // Always target backend port 3001 in this project (TLS is terminated by proxy)
       const base = `${protocol}//${hostname}:3001/api`;
       return base.replace(/\/+$/, '');
     } catch {
