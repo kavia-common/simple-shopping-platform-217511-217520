@@ -37,5 +37,15 @@ export async function getProducts() {
     const text = await res.text().catch(() => '');
     throw new Error(`Failed to fetch products (${res.status}): ${text || res.statusText}`);
   }
-  return res.json();
+  // The backend returns either an array of products or an object with { items, count }.
+  // Normalize to always return an array for the UI.
+  const data = await res.json();
+  if (Array.isArray(data)) {
+    return data;
+  }
+  if (data && Array.isArray(data.items)) {
+    return data.items;
+  }
+  // Fallback: return empty array if shape is unexpected
+  return [];
 }
