@@ -22,6 +22,9 @@ function App() {
 
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [errorProducts, setErrorProducts] = useState('');
+  // Search state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   useEffect(() => {
     // Fetch categories on app load
@@ -38,16 +41,32 @@ function App() {
       });
   }, []);
 
+  // Debounce search input by 300ms
   useEffect(() => {
-    // Fetch products (optionally filtered by category)
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    // Fetch products (optionally filtered by category and search query)
     setLoadingProducts(true);
     setErrorProducts('');
-    const opts =
+
+    const baseFilter =
       category && category.id !== 'all'
         ? (category.slug && category.slug !== 'all'
             ? { category_slug: category.slug }
             : { category_id: category.id })
         : undefined;
+
+    // Build opts including search query if present
+    const opts = (() => {
+      const q = debouncedSearch && debouncedSearch.length > 0 ? { q: debouncedSearch } : undefined;
+      if (!baseFilter && !q) return undefined;
+      return { ...(baseFilter || {}), ...(q || {}) };
+    })();
 
     Api.products(opts)
       .then((list) => {
@@ -61,24 +80,30 @@ function App() {
               : 'https://via.placeholder.com/400x300.png?text=Product',
         }));
 
-        // Save to both displays and cache allProducts when "All" is selected
+        // Behavior:
+        // - If neither category nor search applied (opts undefined): cache allProducts and show list.
+        // - If category/search applied: use server response. If empty and we only had category (no q), fallback to client-side category filter from cache.
         if (!opts) {
           setAllProducts(withImages);
           setProducts(withImages);
         } else {
-          // If backend honored filter, use directly. If not, fallback filter from allProducts cache.
           if (withImages.length > 0) {
             setProducts(withImages);
           } else {
-            const fallback =
-              allProducts.length > 0
-                ? allProducts.filter((p) =>
-                    category.slug && category.slug !== 'all'
-                      ? (p.category_slug ? p.category_slug === category.slug : false)
-                      : String(p.category_id) === String(category.id)
-                  )
-                : [];
-            setProducts(fallback);
+            // Only provide client fallback when searching is not active to avoid misleading results.
+            if (!debouncedSearch) {
+              const fallback =
+                allProducts.length > 0
+                  ? allProducts.filter((p) =>
+                      category.slug && category.slug !== 'all'
+                        ? (p.category_slug ? p.category_slug === category.slug : false)
+                        : String(p.category_id) === String(category.id)
+                    )
+                  : [];
+              setProducts(fallback);
+            } else {
+              setProducts([]); // empty for no match on search
+            }
           }
         }
       })
@@ -87,7 +112,7 @@ function App() {
         setErrorProducts(e.message || 'Failed to load products');
       })
       .finally(() => setLoadingProducts(false));
-  }, [category]);      
+  }, [category, debouncedSearch, allProducts.length]);      
 
   useEffect(() => {
     if (isAuthed) {
@@ -168,10 +193,13 @@ function App() {
       <main style={{ maxWidth: 1024, margin: '0 auto', padding: 16 }}>
         {route === 'products' && (
           <div style={{ display: 'grid', gap: 12 }}>
-            <CategorySelector
+            <CategoryAndSearchBar
               categories={categories}
               selected={category}
-              onChange={setCategory}
+              onChangeCategory={setCategory}
+              searchTerm={searchTerm}
+              onChangeSearch={setSearchTerm}
+              onClearSearch={() => setSearchTerm('')}
             />
             <ProductsPage
               products={products}
@@ -200,42 +228,85 @@ function App() {
   );
 }
 
-function CategorySelector({ categories, selected, onChange }) {
+function CategoryAndSearchBar({
+  categories,
+  selected,
+  onChangeCategory,
+  searchTerm,
+  onChangeSearch,
+  onClearSearch
+}) {
   const handleChange = (e) => {
     const value = e.target.value;
     const found =
       (categories || []).find((c) => String(c.id) === value) ||
       (categories || [])[0] ||
       { id: 'all', slug: 'all', name: 'All' };
-    onChange(found);
+    onChangeCategory(found);
   };
 
   return (
     <Card>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <label htmlFor="category" style={{ fontWeight: 600, color: theme.text }}>
-          Category
-        </label>
-        <select
-          id="category"
-          value={String(selected?.id || 'all')}
-          onChange={handleChange}
-          style={{
-            padding: '8px 12px',
-            borderRadius: 8,
-            border: '1px solid #e5e7eb',
-            background: '#fff',
-            color: '#111827',
-            outline: 'none',
-          }}
-          aria-label="Select product category"
-        >
-          {(categories || []).map((c) => (
-            <option key={c.id} value={String(c.id)}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label htmlFor="category" style={{ fontWeight: 600, color: theme.text }}>
+            Category
+          </label>
+          <select
+            id="category"
+            value={String(selected?.id || 'all')}
+            onChange={handleChange}
+            style={{
+              padding: '8px 12px',
+              borderRadius: 8,
+              border: '1px solid #e5e7eb',
+              background: '#fff',
+              color: '#111827',
+              outline: 'none',
+            }}
+            aria-label="Select product category"
+          >
+            {(categories || []).map((c) => (
+              <option key={c.id} value={String(c.id)}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 240 }}>
+          <label htmlFor="search" style={{ fontWeight: 600, color: theme.text }}>
+            Search
+          </label>
+          <input
+            id="search"
+            type="search"
+            value={searchTerm}
+            onChange={(e) => onChangeSearch(e.target.value)}
+            placeholder="Search products by name"
+            aria-label="Search products by name"
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              borderRadius: 8,
+              border: '1px solid #e5e7eb',
+              outline: 'none',
+              background: '#fff',
+              color: '#111827',
+            }}
+          />
+          {searchTerm?.length > 0 && (
+            <button
+              type="button"
+              onClick={onClearSearch}
+              style={buttonStyle('outline')}
+              aria-label="Clear search"
+              title="Clear search"
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </div>
     </Card>
   );
@@ -259,7 +330,7 @@ function ProductsPage({ products, onAdd, loading, error }) {
   if (!products || products.length === 0) {
     return (
       <Card>
-        <div style={{ color: '#6b7280' }}>No products found for this category.</div>
+        <div style={{ color: '#6b7280' }}>No products found for this selection.</div>
       </Card>
     );
   }

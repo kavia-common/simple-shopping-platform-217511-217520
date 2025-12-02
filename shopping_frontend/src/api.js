@@ -62,13 +62,17 @@ async function http(method, path, body, token) {
 
  // PUBLIC_INTERFACE
 export const Api = {
-  /** List products (optionally filter by category via id or slug) */
+  /** List products (optionally filter by category via id or slug, and search by name with q) */
   products: (opts) => {
     const q = new URLSearchParams();
     if (opts && typeof opts === 'object') {
       // Support either id or slug from UI; backend expected to handle query or we filter client-side if needed
       if (opts.category_id) q.set('category_id', String(opts.category_id));
       if (opts.category_slug) q.set('category_slug', String(opts.category_slug));
+      // Optional search query
+      if (typeof opts.q === 'string' && opts.q.trim().length > 0) {
+        q.set('q', opts.q.trim());
+      }
     }
     const qs = q.toString();
     const path = qs ? `/products?${qs}` : '/products';
