@@ -13,16 +13,23 @@ export function getApiBaseUrl() {
 
 /**
  * PUBLIC_INTERFACE
- * fetchProducts
- * Simple helper that fetches products from the backend /products endpoint.
- * Returns JSON or throws on network errors.
+ * getProducts
+ * Fetches products from the backend /api/products endpoint and returns JSON.
+ * Throws an Error on HTTP/network failure.
  */
-export async function fetchProducts() {
+export async function getProducts() {
   /** This is a public function. */
   const base = getApiBaseUrl();
-  const res = await fetch(`${base}/products`);
+  const url = `${base}/api/products`;
+  const res = await fetch(url, {
+    headers: {
+      // If backend enforces CORS, ensure it includes appropriate Access-Control-Allow-Origin.
+      // Frontend does not need special headers here for a simple GET.
+    },
+  });
   if (!res.ok) {
-    throw new Error(`Failed to fetch products: ${res.status}`);
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to fetch products (${res.status}): ${text || res.statusText}`);
   }
   return res.json();
 }
