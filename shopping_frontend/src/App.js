@@ -8,6 +8,9 @@ function App() {
   /** Minimal SPA with internal "routes": products | cart | orders | auth */
   const [route, setRoute] = useState('products'); // home route
   const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]); // cache for client-side filtering fallback
+  const [categories, setCategories] = useState([]);
+  const [category, setCategory] = useState({ id: 'all', slug: 'all', name: 'All' });
   const [token, setToken] = useState(() => localStorage.getItem('token') || '');
   const [user, setUser] = useState(() => {
     const raw = localStorage.getItem('user');
@@ -21,27 +24,70 @@ function App() {
   const [errorProducts, setErrorProducts] = useState('');
 
   useEffect(() => {
-    // Fetch products from backend (port 3001) using api.js
+    // Fetch categories on app load
+    Api.categories()
+      .then((cats) => {
+        const base = [{ id: 'all', slug: 'all', name: 'All' }];
+        const list = Array.isArray(cats) ? cats : [];
+        setCategories([...base, ...list]);
+      })
+      .catch((e) => {
+        console.error(e);
+        // In case of failure, still provide basic options
+        setCategories([{ id: 'all', slug: 'all', name: 'All' }]);
+      });
+  }, []);
+
+  useEffect(() => {
+    // Fetch products (optionally filtered by category)
     setLoadingProducts(true);
-    Api.products()
+    setErrorProducts('');
+    const opts =
+      category && category.id !== 'all'
+        ? (category.slug && category.slug !== 'all'
+            ? { category_slug: category.slug }
+            : { category_id: category.id })
+        : undefined;
+
+    Api.products(opts)
       .then((list) => {
+        const normalized = Array.isArray(list) ? list : [];
         // Ensure placeholders for missing images
-        const withImages = (list || []).map((p) => ({
+        const withImages = normalized.map((p) => ({
           ...p,
           image:
             p?.image && String(p.image).trim().length > 0
               ? p.image
               : 'https://via.placeholder.com/400x300.png?text=Product',
         }));
-        setProducts(withImages);
-        setErrorProducts('');
+
+        // Save to both displays and cache allProducts when "All" is selected
+        if (!opts) {
+          setAllProducts(withImages);
+          setProducts(withImages);
+        } else {
+          // If backend honored filter, use directly. If not, fallback filter from allProducts cache.
+          if (withImages.length > 0) {
+            setProducts(withImages);
+          } else {
+            const fallback =
+              allProducts.length > 0
+                ? allProducts.filter((p) =>
+                    category.slug && category.slug !== 'all'
+                      ? (p.category_slug ? p.category_slug === category.slug : false)
+                      : String(p.category_id) === String(category.id)
+                  )
+                : [];
+            setProducts(fallback);
+          }
+        }
       })
       .catch((e) => {
         console.error(e);
         setErrorProducts(e.message || 'Failed to load products');
       })
       .finally(() => setLoadingProducts(false));
-  }, []);
+  }, [category]);      
 
   useEffect(() => {
     if (isAuthed) {
@@ -121,12 +167,19 @@ function App() {
 
       <main style={{ maxWidth: 1024, margin: '0 auto', padding: 16 }}>
         {route === 'products' && (
-          <ProductsPage
-            products={products}
-            onAdd={addToCart}
-            loading={loadingProducts}
-            error={errorProducts}
-          />
+          <div style={{ display: 'grid', gap: 12 }}>
+            <CategorySelector
+              categories={categories}
+              selected={category}
+              onChange={setCategory}
+            />
+            <ProductsPage
+              products={products}
+              onAdd={addToCart}
+              loading={loadingProducts}
+              error={errorProducts}
+            />
+          </div>
         )}
         {route === 'cart' && (
           <CartPage
@@ -147,6 +200,47 @@ function App() {
   );
 }
 
+function CategorySelector({ categories, selected, onChange }) {
+  const handleChange = (e) => {
+    const value = e.target.value;
+    const found =
+      (categories || []).find((c) => String(c.id) === value) ||
+      (categories || [])[0] ||
+      { id: 'all', slug: 'all', name: 'All' };
+    onChange(found);
+  };
+
+  return (
+    <Card>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <label htmlFor="category" style={{ fontWeight: 600, color: theme.text }}>
+          Category
+        </label>
+        <select
+          id="category"
+          value={String(selected?.id || 'all')}
+          onChange={handleChange}
+          style={{
+            padding: '8px 12px',
+            borderRadius: 8,
+            border: '1px solid #e5e7eb',
+            background: '#fff',
+            color: '#111827',
+            outline: 'none',
+          }}
+          aria-label="Select product category"
+        >
+          {(categories || []).map((c) => (
+            <option key={c.id} value={String(c.id)}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
+    </Card>
+  );
+}
+
 function ProductsPage({ products, onAdd, loading, error }) {
   if (loading) {
     return (
@@ -158,7 +252,14 @@ function ProductsPage({ products, onAdd, loading, error }) {
   if (error) {
     return (
       <Card>
-        <div style={{ color: theme.error }}>Error: {error}</div>
+        <div style={{ color: theme.error, fontWeight: 600 }}>Error: {error}</div>
+      </Card>
+    );
+  }
+  if (!products || products.length === 0) {
+    return (
+      <Card>
+        <div style={{ color: '#6b7280' }}>No products found for this category.</div>
       </Card>
     );
   }

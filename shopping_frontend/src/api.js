@@ -60,13 +60,28 @@ async function http(method, path, body, token) {
   return data;
 }
 
-// PUBLIC_INTERFACE
+ // PUBLIC_INTERFACE
 export const Api = {
-  /** List products */
-  products: () => http('GET', '/products'),
+  /** List products (optionally filter by category via id or slug) */
+  products: (opts) => {
+    const q = new URLSearchParams();
+    if (opts && typeof opts === 'object') {
+      // Support either id or slug from UI; backend expected to handle query or we filter client-side if needed
+      if (opts.category_id) q.set('category_id', String(opts.category_id));
+      if (opts.category_slug) q.set('category_slug', String(opts.category_slug));
+    }
+    const qs = q.toString();
+    const path = qs ? `/products?${qs}` : '/products';
+    return http('GET', path);
+  },
 
   /** Get product details */
   product: (id) => http('GET', `/products/${id}`),
+
+  /** Categories */
+  categories: () => http('GET', '/categories'),
+  categoryById: (id) => http('GET', `/categories/${id}`),
+  categoryBySlug: (slug) => http('GET', `/categories/slug/${slug}`),
 
   /** Signup and return {user, token} */
   signup: (email, password) => http('POST', '/auth/signup', { email, password }),
@@ -78,17 +93,21 @@ export const Api = {
   cart: (token) => http('GET', '/cart', undefined, token),
 
   /** Add item to cart */
-  addToCart: (token, product_id, quantity) => http('POST', '/cart/items', { product_id, quantity }, token),
+  addToCart: (token, product_id, quantity) =>
+    http('POST', '/cart/items', { product_id, quantity }, token),
 
   /** Update cart item quantity (<=0 removes) */
-  updateCart: (token, product_id, quantity) => http('PUT', '/cart/items', { product_id, quantity }, token),
+  updateCart: (token, product_id, quantity) =>
+    http('PUT', '/cart/items', { product_id, quantity }, token),
 
   /** Remove cart item */
-  removeFromCart: (token, product_id) => http('DELETE', `/cart/items/${product_id}`, undefined, token),
+  removeFromCart: (token, product_id) =>
+    http('DELETE', `/cart/items/${product_id}`, undefined, token),
 
   /** Create order from cart */
   createOrder: (token) => http('POST', '/orders', undefined, token),
 
   /** Get order details */
-  order: (token, order_id) => http('GET', `/orders/${order_id}`, undefined, token),
+  order: (token, order_id) =>
+    http('GET', `/orders/${order_id}`, undefined, token),
 };
